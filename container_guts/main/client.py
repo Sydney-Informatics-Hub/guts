@@ -29,9 +29,11 @@ class ManifestGenerator:
         if tech == "docker":
             from .container import DockerContainer
             self.container = DockerContainer()
-        elif tech == "singularity":
+            return
+        if tech == "singularity":
             from .container import SingularityContainer
             self.container = SingularityContainer()
+            return
         logger.exit(f"Container technology {tech} is not supported.")
 
     @ensure_container
