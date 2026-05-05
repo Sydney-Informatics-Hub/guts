@@ -28,9 +28,11 @@ class ManifestGenerator:
         """
         if tech == "docker":
             from .container import DockerContainer
-        else:
-            logger.exit(f"Container technology {tech} is not supported.")
-        self.container = DockerContainer()
+            self.container = DockerContainer()
+        elif tech == "singularity":
+            from .container import SingularityContainer
+            self.container = SingularityContainer()
+        logger.exit(f"Container technology {tech} is not supported.")
 
     @ensure_container
     def save_path(self, image):
