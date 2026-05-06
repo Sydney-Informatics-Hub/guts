@@ -49,7 +49,7 @@ class ManifestGenerator:
         """
         if isinstance(image, ContainerName):
             return image
-        return ContainerName(image)
+        return self.container.get_container(image)
 
     @ensure_container
     def diff(self, image, database=None):

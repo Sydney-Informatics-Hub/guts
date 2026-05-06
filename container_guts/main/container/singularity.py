@@ -9,10 +9,26 @@ import os
 import container_guts.utils as utils
 
 from .base import ContainerName, ContainerTechnology
-from .decorator import ensure_container
+from .decorator import ensure_caontainer
 
 
 class SingularityContainerName(ContainerName):
+    def parse(self, raw):
+        if os.path.isabs(raw):
+            """
+            CVMFS image uses the raw value as the path, and parse the tool/tag from the basename.
+            """
+            basename = os.path.basename(raw)
+            self.tool, _, self.tag = basename.partition(":")
+            if not self.tag:
+                self.tag = "latest"
+            self.registry = None
+            self.namespace = None
+            self.digest = None
+            self.version = None
+        else:
+            super().parse(raw)
+
     @property
     def uri(self):
         if os.path.isabs(self.raw):
