@@ -9,7 +9,7 @@ import os
 import container_guts.utils as utils
 
 from .base import ContainerName, ContainerTechnology
-from .decorator import ensure_caontainer
+from .decorator import ensure_container
 
 
 class SingularityContainerName(ContainerName):
