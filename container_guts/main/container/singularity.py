@@ -82,11 +82,12 @@ class SingularityContainer(ContainerTechnology):
 
         export_dir = os.path.join(tmpdir, "root")
         meta_dir = os.path.join(tmpdir, "meta")
-        os.makedirs(export_dir)
         os.makedirs(meta_dir)
 
-        self.pull(image)
-        self.call([self.command, "build", "--sandbox", export_dir, image.uri])
+        # singularity build --sandbox creates export_dir itself; pre-creating it causes a FATAL error.
+        # For docker:// URIs, build pulls inline; for local SIF paths (CVMFS), it reads the file.
+        # self.pull() is not needed here and causes "file already exists" errors on retry.
+        self.call([self.command, "build", "--sandbox", "--force", export_dir, image.uri])
 
         labels = {}
         res = self.call(
