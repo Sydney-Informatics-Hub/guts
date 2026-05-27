@@ -68,14 +68,56 @@ class SingularityContainer(ContainerTechnology):
         """
         pass
 
+    def _export_via_exec(self, image, export_dir):
+        """
+        Fallback export when sandbox build fails (e.g. old SIF nil-pointer crash).
+
+        Runs 'singularity exec <image> env' to discover PATH dirs, then
+        'singularity exec <image> ls <dir>' for each to enumerate executables,
+        and creates empty placeholder files under export_dir so that
+        explore_paths / extract_filesystem can proceed normally.
+        """
+        os.makedirs(export_dir, exist_ok=True)
+
+        env_res = self.call(
+            [self.command, "exec", image.uri, "env"],
+            stream=False,
+            allow_fail=True,
+        )
+
+        path_dirs = []
+        if env_res["return_code"] == 0:
+            for line in env_res["message"].splitlines():
+                if line.startswith("PATH="):
+                    path_dirs = [p for p in line[5:].split(":") if p]
+                    break
+
+        if not path_dirs:
+            path_dirs = ["/usr/local/bin", "/usr/bin", "/bin"]
+
+        for path_dir in path_dirs:
+            ls_res = self.call(
+                [self.command, "exec", image.uri, "ls", path_dir],
+                stream=False,
+                allow_fail=True,
+            )
+            if ls_res["return_code"] != 0:
+                continue
+            dest_dir = os.path.join(export_dir, path_dir.lstrip("/"))
+            os.makedirs(dest_dir, exist_ok=True)
+            for name in ls_res["message"].splitlines():
+                name = name.strip()
+                if name:
+                    open(os.path.join(dest_dir, name), "w").close()
+
     @ensure_container
     def export(self, image, tmpdir=None, cleanup=True):
         """
         Export a Singularity image into a directory.
 
-        Uses 'singularity build --sandbox' to extract the full filesystem
-        into root/, and 'singularity inspect --json' to write meta/config.json
-        in the format get_manifests() expects.
+        Tries 'singularity build --sandbox' first.  Falls back to exec-based
+        enumeration for old SIF formats that crash during sandbox extraction
+        (e.g. nil-pointer in addResolvConfMount on Singularity 4.x).
         """
         if not tmpdir:
             tmpdir = utils.get_tmpdir()
@@ -85,9 +127,13 @@ class SingularityContainer(ContainerTechnology):
         os.makedirs(meta_dir)
 
         # singularity build --sandbox creates export_dir itself; pre-creating it causes a FATAL error.
-        # For docker:// URIs, build pulls inline; for local SIF paths (CVMFS), it reads the file.
-        # self.pull() is not needed here and causes "file already exists" errors on retry.
-        self.call([self.command, "build", "--sandbox", "--force", export_dir, image.uri])
+        res = self.call(
+            [self.command, "build", "--sandbox", "--force", export_dir, image.uri],
+            stream=False,
+            allow_fail=True,
+        )
+        if res["return_code"] != 0:
+            self._export_via_exec(image, export_dir)
 
         labels = {}
         res = self.call(
