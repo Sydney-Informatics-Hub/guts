@@ -216,15 +216,21 @@ class ManifestGenerator:
     def _parse_paths(self, envar):
         """
         Parse a string environment variable for paths.
+
+        Only PATH itself. Matching any variable that merely contains "PATH"
+        pulls in MODULEPATH, LD_LIBRARY_PATH, MANPATH and friends, and since
+        only the literal "PATH=" is stripped their prefix stays glued to the
+        first entry - which is where manifest keys like
+        "LD_LIBRARY_/.singularity.d/libs" come from.
         """
         paths = []
         # Cut out early given empty string
         if not envar:
             return paths
-        if "PATH" in envar:
+        name, _, value = envar.partition("=")
+        if name.strip() == "PATH":
             print(envar)
-            envar = envar.replace(" ", "").replace("PATH=", "").strip()
-            for path in envar.split(":"):
+            for path in value.replace(" ", "").strip().split(":"):
                 if not path:
                     continue
                 paths.append(path)
